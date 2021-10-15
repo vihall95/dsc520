@@ -1,0 +1,85 @@
+---
+title: "Week 7 Assignment"
+author: "Victoria Hall"
+date: "10/14/2021"
+output: pdf_document
+---
+
+# Student Survey Results
+
+```{r include = FALSE}
+setwd("~/GitHub/dsc520")
+```
+
+```{r include = FALSE}
+student_survey_df <- read.csv("data/student-survey.csv")
+head(student_survey_df)
+```
+## Use R to calculate the covariance of the Survey variables and provide an explanation of why you would use this calculation and what the results indicate.
+```{r echo=FALSE}
+print(paste("Covariance:",cov(student_survey_df$TimeReading,student_survey_df$TimeTV)))
+```
+> I found the covariance between the time spent reading and the time spent watching tv because we are trying to determine if there is a relationship between the two variables, that is to say, when one variable changes, does the other as well. In this instance, there is a negative covariance between time reading and time spent watching tv, indicating that as one goes up the other goes down. IE, Time spent reading goes down when the time spent watching tv goes up.
+
+## Examine the Survey data variables. What measurement is being used for the variables? Explain what effect changing the measurement being used for the variables would have on the covariance calculation. Would this be a problem? Explain and provide a better alternative if needed.
+>The data doesn't necessarily say how each is being measured but at a glance it appears that time reading is in hours while time watching TV is in minutes. Because covariance is dependent on the variances of the variables included, scaling differences will impact and change the covariance. However, we use covariance to find the direction of the relationship between the two variables and not the magnitude of the relationship. So, in this instance it isn't necessarily giving us wrong information. If we wanted to be consistent in units we can add an additional variable to the dataframe that shows time reading in minutes. The below code demonstrates this. The number itself has increased but directionally the information is still the same. 
+
+```{r include=FALSE}
+library(dplyr)
+library(magrittr)
+```
+
+```{r echo= FALSE}
+student_survey_df <-student_survey_df %>% mutate(TimeReadingMinutes=TimeReading*60)
+head(student_survey_df)
+print(paste("Covariance with Minutes:",cov(student_survey_df$TimeReadingMinutes,student_survey_df$TimeTV)))
+```
+## Choose the type of correlation test to perform, explain why you chose this test, and make a prediction if the test yields a positive or negative correlation
+>Checking form normality using the Shapiro Wilkes test because our sample size is small.. The results show p-values > .05 suggesting the distribution is not significantly different than the normal distribution. Because this data appears to be regularly distributed and it is inteveral data, I plan to use the Perason Correlation test. I predict that time spent reading will relate to time spent watching TV negatively. That is to say as a student reads more they will probably watch TV less.
+
+```{r echo=FALSE}
+shapiro.test(student_survey_df$TimeTV)
+shapiro.test(student_survey_df$TimeReadingMinutes)
+```
+## Perform a correlation analysis of:
+
+### All variables - I am removing the time spent reading in hour from the dataframe and just using minutes
+```{r echo=FALSE}
+student_survey_df_min<-student_survey_df[,c("TimeTV","Happiness","Gender","TimeReadingMinutes")]
+cor(student_survey_df_min, method = "pearson")
+```
+
+### A single correlation between two a pair of the variables
+```{r echo=FALSE}
+print(paste("Correlation between TV time and reading time:",cor(student_survey_df_min$TimeReadingMinutes,student_survey_df_min$TimeTV,method = "pearson")))
+```
+
+### Repeat your correlation test in step 2 but set the confidence interval at 99%
+```{r echo=FALSE}
+cor.test(student_survey_df_min$TimeReadingMinutes,student_survey_df_min$TimeTV,method = "pearson", conf.level = 0.99)
+```
+
+### Describe what the calculations in the correlation matrix suggest about the relationship between the variables. Be specific with your explanation.
+>We see a reasonably large effect on time watching tv and happiness as well as on time spent reading. Happiness appears to be postively and strongly related to the amount of time spent watching TV with r=.637 meaing we see an increase in happiness at the same time we see an increase in watching tv. We see an even stronger relationship between time watching tv and time spent reading however these are negatively related with r=-.883. Gender doesn't appear to have a relationship with time watching tv with an r=.007. Gender for the most part doesn't seem to have a relationship to our other variables in any meaningful way. Interestingly, we do see a strong negative relationship between reading and happiness with an r = -.435. 
+
+## Calculate the correlation coefficient and the coefficient of determination, describe what you conclude about the results.
+```{r echo=FALSE}
+correlationcoef<- cor(student_survey_df_min$TimeReadingMinutes,student_survey_df_min$TimeTV,method = "pearson")
+coefdetermindation <- cor(student_survey_df_min$TimeReadingMinutes,student_survey_df_min$TimeTV,method = "pearson")^2
+print(paste("Pearson's R Correlation Coefficient:",correlationcoef))
+print(paste("Coefficient of determination:","%",coefdetermindation*100))
+```
+> About 78% of variability is shared between time spent watching TV and time spent reading. This means time spent reading accounts for more than three-forths of the variation in exam scores. Though this does not necessarily infer a causal relationship it still shows a strong relationship between time spent watching tv and time spent spent reading. We see that time reading accounts 78% of the variation in the time spent watching TV and that this relationship is negative so as time spent reading increases, time spent watching TV decreases. 
+
+## Based on your analysis can you say that watching more TV caused students to read less? Explain.
+>Though I did my analysis inveresly (More time spent readings means less time watching TV) I can conclude that there is a strong negative relationship between the two.The coefficient of determination shows that time spent reading accounts for a large portion of the variation in time spent watching TV. However, the dataset was small and we would need more robust information to try and determine a causal relationship. 
+
+## Pick three variables and perform a partial correlation, documenting which variable you are “controlling”. Explain how this changes your interpretation and explanation of the results.
+```{r echo=FALSE}
+library(ggm)
+partialcoef<-pcor(c("TimeReadingMinutes","TimeTV","Happiness"),var(student_survey_df_min))
+partialdetr<-pcor(c("TimeReadingMinutes","TimeTV","Happiness"),var(student_survey_df_min))^2
+print(paste("Partial Correlation:",partialcoef))
+print(paste("Partial Coefficient of Determination:","%",partialdetr*100))
+```
+>Controlling for happiness does not significantly change the amount of variation that is accounted for by time spent reading. This means that our conclusion isn't altered and we can still say that time spent reading decreases as time spent watching tv increases. 
