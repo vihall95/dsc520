@@ -1,0 +1,132 @@
+---
+title: "Housing_Data_HallVictoria"
+author: "Victoria Hall"
+date: "10/26/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include = FALSE}
+library(readxl)
+library(tidyverse)
+library(plyr)
+library(dplyr)
+library(pastecs)
+library(magrittr)
+library(purrr)
+library(stringr)
+library(lm.beta)
+library(lmtest)
+setwd("~/GitHub/dsc520")
+housing_data<-read_excel("data/week-7-housing.xlsx")
+```
+
+##b. i. I changed to a dataframe and removed blank sale prices from the data
+``` {r include=FALSE}
+head(housing_data)
+nrow(housing_data)
+housing_data<-data.frame(housing_data) #Setting as dataframe
+stat.desc(housing_data$Sale.Price)
+housing_data %>% compact() %>% arrange(Sale.Price) #Removing Null, len 0
+```
+##b. ii.I will be running two regressions. One simple regression of sale price as it is explained by square footage of the lot. The second is a multiple regression that tries to explain sale price through the square footage of the lot, the number of bedrooms, the number of full baths and the year the home was built. I choose these because having more bathrooms and bedrooms, as well as a larger square footage causes me to hypothesize that the sales price will increase. I also included year built because I am also thinking that the newer the home, the more amenities and the more expensive the home will be. 
+```{r echo=FALSE}
+saleprice_lm<-lm(Sale.Price ~ sq_ft_lot,data=housing_data)
+saleprice_mult_lm<-lm(Sale.Price ~ sq_ft_lot + bedrooms + bath_full_count + year_built, data=housing_data)
+```
+
+##b. iii. Summary of simple linear model and the multiple regression.R2 for the simple model is .01435 while our R2 for the multiple regression is better at .1418 meaning that the multiple regression better explains the variance of the sale price. Around 14% of the variation can be explained by square footage, # of bedrooms, # of full baths, and the year it was built. 
+```{r echo=FALSE}
+summary(saleprice_lm)
+summary(saleprice_mult_lm)
+```
+
+##b iv. Standardized Beta Coefficients allow us to compare the strength of each of our independent variables to the dependent, in this case the comparative strength that square footage, bedrooms, bathrooms, and year built have on sale price. The units are standard deviations which helps with any scaling issues between variables.In our data we see the year built more strongly impacts the variance in sale prices than our other predictors. The next strongest is # of bedrooms and the weakest are Square footage and # of bathrooms which have similar amount of strength. 
+```{r echo= FALSE}
+saleprice_mult_lm_beta<-lm.beta(saleprice_mult_lm)
+options(scipen = 999)
+summary(saleprice_mult_lm_beta)
+```
+
+##b v. The confidence intervals below are two values in which the values of the betas should fall between. It should reflect the amount of random error in our sample and essentially provides a range of the likely value of our parameters
+```{r echo=FALSE}
+confidenceintervals<-confint(saleprice_mult_lm)
+confidenceintervals
+```
+
+##b. vi. There is significant improvement over the simple regression model when we use multiple regression. F(3,12860)=636.71, p<.001. 
+```{r echo=FALSE}
+anovatest<-anova(saleprice_lm,saleprice_mult_lm)
+anovatest
+```
+##b vii.Dataframe with variables of interest as well as casewise analysis of residuals (for Outliers) and cooks distance for influential cases
+```{r echo=FALSE}
+casewiseanalysis<-data.frame(Sale.Price=housing_data$Sale.Price,sq_ft_lot=housing_data$sq_ft_lot,bedrooms=housing_data$bedrooms,bath_full_count=housing_data$bath_full_count,year_built=housing_data$year_built)
+#Finding residuals to identify outliers and adding to df.
+casewiseanalysis$residuals<-resid(saleprice_mult_lm)
+casewiseanalysis$cooks.distance<-cooks.distance(saleprice_mult_lm)
+#Arranging to look at largest residuals first
+casewiseanalysis<-arrange(casewiseanalysis,residuals)
+head(casewiseanalysis)
+```
+
+##b viii. Adding large residuals to dataframe
+```{r echo=FALSE}
+casewiseanalysis$standardized.residuals<-rstandard(saleprice_mult_lm)
+casewiseanalysis$large.residual<-casewiseanalysis$standardized.residuals>2 | casewiseanalysis$standardized.residuals< -2
+head(casewiseanalysis)
+```
+
+##b iX. Sum of large residuals - There are 354 cases with large residuals
+```{r echo=FALSE}
+sum(casewiseanalysis$large.residual)
+```
+
+##b x.There are 354 cases that evaluate as true, IE having large residuals.              
+```{r echo=FALSE}
+residuals_table<-casewiseanalysis[casewiseanalysis$large.residual,c("Sale.Price","sq_ft_lot","bath_full_count","year_built","standardized.residuals")]
+```
+
+##b xi. There does appear to be a case that exceeds one in cook's distance that may be having undue influence over the model. With a value of 1.17, it isn't substantially larger but anyone value or 1 should be reviewed. There are 14 cases in which see leverage values 3 times as high as the average leverage with the highest value of .112.This is case 295 which is also our case with the the largest cooks distance. There are 282 cases that fall out the boundaries for our covariance ratios. Again, case 295 has the highest outside of the range with a value of 1.103. The smallest minimum value is .96. Still these are very close to falling within our boundaries. 
+```{r echo=FALSE}
+casewiseanalysis$cooksdistance<-cooks.distance((saleprice_mult_lm))
+casewiseanalysis$leverage<-hatvalues(saleprice_mult_lm)
+casewiseanalysis$covariance_ratio<-covratio(saleprice_mult_lm)
+casewisetest<-casewiseanalysis[casewiseanalysis$large.residual, c("cooksdistance","leverage","covariance_ratio")]
+paste("Max Cooks Distance:",max(casewisetest$cooksdistance))
+paste("Mean Leverage:",mean(casewisetest$leverage)*3)
+sort(casewisetest$leverage)
+paste("Max Leverage:",max(casewisetest$leverage))
+length(which(casewisetest$leverage > .00507))
+top<-1+3*(4+1)/12860
+bottom<-1-3*(4+1)/12860
+paste("Cases out of Boundaries:",length(which(casewisetest$covariance_ratio<bottom | casewisetest$covariance_ratio>top)))
+paste("Max Covariance Ratio:",max(casewisetest$covariance_ratio))
+paste("Min Covariance Ration:",min(casewisetest$covariance_ratio))
+```
+
+##b xii. The durbin watson test does raise concerns about our model with a value less than 1 and our P value is less than .05 suggesting signficance.This suggests that our model may not have independent errors.
+```{r echo=FALSE}
+library(lmtest)
+dwtest(saleprice_mult_lm)
+```
+
+##b xiii. Our multicollinearity tests do not raise cause for concerns. Our largest VIF is 1.44, which is way below 10 and the average VIF is only slight above 1 at 1.23. Our tolerance tests also suggest that this is no collinearity within or data. 
+``` {r echo=FALSE}
+library(car)
+paste("VIF:",vif(saleprice_mult_lm))
+paste("Mean VIF:",mean(vif(saleprice_mult_lm)))
+paste("Tolerance:",1/vif(saleprice_mult_lm))
+```
+
+##b xiv.Our plots indicate nonnormality in our data. Our QQ Plot isn't straight and we see a right winged tail on our histogram. 
+```{r echo=FALSE}
+plot(saleprice_mult_lm)
+hist(casewiseanalysis$standardized.residuals)
+qqnorm(casewiseanalysis$standardized.residuals)
+```
+
+##b v. There does appear to be some bias in our model. We have some cases causing undue influence as well as outliers and our residuals are not normally distributed. While some of these values weren't extreme, it would be unfair to try and draw assumtpion about the entire population based on this model. 
