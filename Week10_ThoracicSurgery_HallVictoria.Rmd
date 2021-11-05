@@ -1,0 +1,40 @@
+---
+title: "Week10_ThoracicSurgery"
+author: "Victoria Hall"
+date: "11/3/2021"
+output: pdf_document
+---
+
+``` {r include=FALSE}
+library(foreign)
+library(mlogit)
+library(tidyverse)
+thoracicdf<-read.arff("data/ThoraricSurgery.arff")
+head(thoracicdf)
+```
+
+#In our model, we show a number of high value coefficients yet they have high standard errors and large P values that would indicate these aren't great predictors in our model. You see this is the diagnostic variables (DGN) and a few other indicators as well. There are 4 coefficients that seem to be high and statistically significant. These are PRE9T (Has Dysponea before surgery ), PRE14OC14 (largest size tumor),PRE17T (Has diabetes mellitus), and PRE30T (smoker).A model with these 4 predictors would probably the best choices for the model. If we were to pick the strongest of these choices only, I would pick PRE9T which indicates the patient has Dsyponea before surgery
+```{r echo=FALSE}
+testglm<-glm(Risk1Yr~ .,data=thoracicdf, family=binomial)
+options(scipen=999)
+summary(testglm)
+```
+
+##I have created an updated model using the 4 significant predictors identified previously. In order to to just look at the largest size tumor as a predictor, I created a new column that is a boolean that indicates if the case has a the largest size tumor (OC14), mark as true, otherwise mark as false. 
+```{r echo=FALSE}
+#Creating new boolean variable to indicate if they have the largest tumor
+thoracicdf<-mutate(thoracicdf, "Largest_Tumor" = ifelse(PRE14 == "OC14", TRUE, FALSE))
+head(thoracicdf)
+finalglm<-glm(Risk1Yr~PRE9+PRE17+PRE30+Largest_Tumor, data = thoracicdf, family = binomial)
+summary(finalglm)
+```
+
+
+##In order to test the accuracy of our model, I predicted the values of the cases and created a confusion matrix that shows the actual values of whether the patient died (T) compared to the predictions of our models. I then found the percent accuracy. Our model was 85% accurate in predicting whether the patient died 1 year after treatment or not. 
+```{r echo=FALSE}
+prediction<-predict(finalglm,thoracicdf,type="response")
+prediction
+confmatrix<-table(Actual_Value=thoracicdf$Risk1Yr,Predicted_Value=prediction>0.5)
+confmatrix
+(confmatrix[[1,1]]+confmatrix[[2,2]])/sum(confmatrix)
+```
