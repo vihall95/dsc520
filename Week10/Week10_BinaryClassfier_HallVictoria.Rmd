@@ -1,0 +1,32 @@
+---
+title: "Week10_BinaryClassifier"
+author: "Victoria Hall"
+date: "11/5/2021"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/hallt/Documents/GitHub/dsc520")
+```
+
+
+```{r include=FALSE}
+library(tidyverse)
+library(mlogit)
+binarydf<-read.csv("data/binary-classifier-data.csv")
+head(binarydf)
+```
+
+#Model Details. Both of our coefficients appear to be statistically sginificant and have a negative impact with our dependent variable- label. 
+```{r echo=FALSE}
+model1<-glm(label~x+y, data = binarydf, family = binomial())
+summary(model1)
+```
+
+##Model Accuracy - Our model is 58% accurate at predicting the label value. I found this by applying the model to the actual values in our dataframe to find their predictions compared to the actual values. 
+``` {r echo=FALSE}
+predictionm1<-predict(model1,binarydf,type="response")
+confmatrixm1<-table(Actual_Value=binarydf$label,Predicted_Value=predictionm1>0.5)
+confmatrixm1
+(confmatrixm1[[1,1]]+confmatrixm1[[2,2]])/sum(confmatrixm1)
+```
