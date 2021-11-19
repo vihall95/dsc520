@@ -1,0 +1,158 @@
+---
+title: "Week11&12_HallVictoria"
+author: "Victoria Hall"
+date: "11/12/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/hallt/Documents/GitHub/dsc520")
+```
+
+```{r include=FALSE}
+#Loading libraries and dataframes
+library(tidyverse)
+library(TSdist)
+library(class)
+library(scales)
+binarydf<-read.csv("data/binary-classifier-data.csv")
+trinarydf<-read.csv("data/trinary-classifier-data.csv")
+head(binarydf)
+sum(is.na(binarydf$x))
+sum(is.na(binarydf$y))
+sum(is.na(binarydf$label))
+head(trinarydf)
+```
+## Looking at the scatter plots below shows that neither of these datasets are normally distributed. We cannot bank on our assumption of this data being linearly distributed. 
+```{r echo=FALSE}
+#Checking data structure of our variables and converting the label to a factor. Then plotting each DF with label as color. 
+str(binarydf)
+binarydf$label<-as.factor(binarydf$label)
+binaryplot<-ggplot(binarydf, aes(x=x, y=y))+geom_point(aes(color=label))+labs(title= "Binary Data")
+binaryplot
+str(trinarydf)
+trinarydf$label<-as.factor(trinarydf$label)
+trinaryplot<-ggplot(trinarydf, aes(x=x, y=y))+geom_point(aes(color=label))+labs(title = "Trinary Data")
+trinaryplot
+```
+
+## Euclidean Distance
+```{r echo=False}
+#Using TDist to find Euclidean distance. 
+paste("Euclidean Distance of Binary Data:",EuclideanDistance(binarydf$x,binarydf$y))
+paste("Euclidean Distance of Trinary Data:",EuclideanDistance(trinarydf$x,trinarydf$y))
+```
+```{r include=FALSE}
+#I wrote my own function to doublecheck the above was correct
+eucfunc<- function(x,y) sqrt(sum((x-y)^2))
+eucfunc(binarydf$x,binarydf$y)
+eucfunc(trinarydf$x,trinarydf$y)
+```
+
+```{r include=FALSE}
+#Separating training and test datasets
+#Double checking number of rows in each dataframe.
+paste("Cases in Binary Data:",nrow(binarydf))
+paste("Cases in Trinary Data:", nrow(trinarydf))
+#Creating Test and Train Sets. Using 70% of data to train and 30% to test
+BDF<-sample(1:nrow(binarydf),size = nrow(binarydf)*0.7, replace = FALSE)
+btrain<-binarydf[BDF,]
+btest<-binarydf[-BDF,]
+btrain_labels<-binarydf[BDF,1]
+btest_labels<-binarydf[-BDF,1]
+
+CDF<-sample(1:nrow(trinarydf),size = nrow(trinarydf)*0.7, replace = FALSE)
+ttrain<-trinarydf[CDF,]
+ttest<-trinarydf[-CDF,]
+ttrain_labels<-trinarydf[CDF,1]
+ttest_labels<-trinarydf[-CDF,1]
+```
+
+## Accuracy of Binary models with different different values of k. The most accurate models are between 3 and 5 groupings. 
+```{r echo=FALSE}
+#Creating models and checking for accuracy
+btest_pred3<- knn(train = btrain, test = btest,cl=btrain_labels, k=3 )
+btest_pred5<- knn(train = btrain, test = btest,cl=btrain_labels, k=5 )
+btest_pred10<- knn(train = btrain, test = btest,cl=btrain_labels, k=10 )
+btest_pred15<- knn(train = btrain, test = btest,cl=btrain_labels, k=15 )
+btest_pred20<- knn(train = btrain, test = btest,cl=btrain_labels, k=20)
+#Find the the proportion of correct classification
+confmatrix3<-table(btest_pred3,btest_labels)
+k3acc<-(confmatrix3[[1,1]]+confmatrix3[[2,2]])/sum(confmatrix3)
+k3acc<- scales::percent(k3acc)
+confmatrix3
+paste("K=3 Accuracy:",k3acc)
+
+confmatrix5<-table(btest_pred5,btest_labels)
+k5acc<-(confmatrix5[[1,1]]+confmatrix5[[2,2]])/sum(confmatrix5)
+k5acc<- scales::percent(k5acc)
+confmatrix5
+paste("K=5 Accuracy:",k5acc)
+
+confmatrix10<-table(btest_pred10,btest_labels)
+k10acc<-(confmatrix10[[1,1]]+confmatrix10[[2,2]])/sum(confmatrix10)
+k10acc<- scales::percent(k10acc)
+confmatrix10
+paste("K=10 Accuracy:",k10acc)
+
+
+
+confmatrix15<-table(btest_pred15,btest_labels)
+k15acc<-(confmatrix15[[1,1]]+confmatrix15[[2,2]])/sum(confmatrix15)
+k15acc<- scales::percent(k15acc)
+confmatrix15
+paste("K=15 Accuracy:",k15acc)
+
+
+confmatrix20<-table(btest_pred20,btest_labels)
+k20acc<-(confmatrix20[[1,1]]+confmatrix20[[2,2]])/sum(confmatrix20)
+k20acc<- scales::percent(k20acc)
+confmatrix20
+paste("K=20 Accuracy:",k20acc)
+```
+## Accuracy of Trinary models with different different values of k. The most accurate model is with 3 groupings.
+```{r echo=FALSE}
+#Creating models and checking for accuracy
+ttest_pred3<- knn(train = ttrain, test = ttest,cl=ttrain_labels, k=3 )
+ttest_pred5<- knn(train = ttrain, test = ttest,cl=ttrain_labels, k=5 )
+ttest_pred10<- knn(train = ttrain, test = ttest,cl=ttrain_labels, k=10 )
+ttest_pred15<- knn(train = ttrain, test = ttest,cl=ttrain_labels, k=15 )
+ttest_pred20<- knn(train = ttrain, test = ttest,cl=ttrain_labels, k=20)
+#Find the the proportion of correct classification
+tconfmatrix3<-table(ttest_pred3,ttest_labels)
+tk3acc<-(tconfmatrix3[[1,1]]+tconfmatrix3[[2,2]]+tconfmatrix3[[3,3]])/sum(tconfmatrix3)
+tk3acc<- scales::percent(tk3acc)
+tconfmatrix3
+paste("K=3 Accuracy:",tk3acc)
+
+tconfmatrix5<-table(ttest_pred5,ttest_labels)
+tk5acc<-(tconfmatrix5[[1,1]]+tconfmatrix5[[2,2]]+tconfmatrix5[[3,3]])/sum(tconfmatrix5)
+tk5acc<- scales::percent(tk5acc)
+tconfmatrix5
+paste("K=5 Accuracy:",tk5acc)
+
+tconfmatrix10<-table(ttest_pred10,ttest_labels)
+tk10acc<-(tconfmatrix10[[1,1]]+tconfmatrix10[[2,2]]+tconfmatrix10[[3,3]])/sum(tconfmatrix10)
+tk10acc<- scales::percent(tk10acc)
+tconfmatrix10
+paste("K=10 Accuracy:",tk10acc)
+
+
+
+tconfmatrix15<-table(ttest_pred15,ttest_labels)
+tk15acc<-(tconfmatrix15[[1,1]]+tconfmatrix15[[2,2]]+tconfmatrix15[[3,3]])/sum(tconfmatrix15)
+tk15acc<- scales::percent(tk15acc)
+tconfmatrix15
+paste("K=15 Accuracy:",tk15acc)
+
+
+tconfmatrix20<-table(ttest_pred20,ttest_labels)
+tk20acc<-(tconfmatrix20[[1,1]]+tconfmatrix20[[2,2]]+tconfmatrix20[[3,3]])/sum(tconfmatrix20)
+tk20acc<- scales::percent(tk20acc)
+tconfmatrix20
+paste("K=20 Accuracy:",tk20acc)
+```
+## When you look at our scatter plots there is no evidence of a linear relationship. We do see distinct groupings rather than a linear relationship suggesting that a linear classifier isn't the best way to represent the relationships
+
+## The K nearest neighbors model performed better than the logistic regression model we ran on our binary dataset. It was more accurate with a 98% accuracy. The accuracy is different because one of the assumptions we make with the logistic regression we ran last week was that the data was dispersed in a linear relationship. By looking at our scatterplots we can see that we violated that assumption. The KNN model is non-parametric and relies on distance. We assume that similar things exist in close proximity which is how our model determines outcomes. 

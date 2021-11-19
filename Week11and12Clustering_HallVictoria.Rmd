@@ -1,0 +1,98 @@
+---
+title: "week12clustering"
+author: "Victoria Hall"
+date: "11/19/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/hallt/Documents/GitHub/dsc520")
+```
+
+
+``` {r include= FALSE}
+clusteringdf<-read.csv("data/clustering-data.csv")
+library(tidyverse)
+library(stats)
+library(useful)
+head(clusteringdf)
+```
+
+## Summary info and ScatterPlot. Our scatterplot shows this is not not normally distributed. 
+```{r echo=FALSE}
+summary(clusteringdf)
+ggplot(clusteringdf, aes(x=x, y=y))+geom_point()
+```
+## KMeans
+```{r echo=FALSE}
+set.seed(100)
+k2 <- kmeans(clusteringdf, 2, nstart = 25 )
+plot(k2,data = clusteringdf)
+```
+
+```{r echo=FALSE}
+set.seed(100)
+k3 <- kmeans(clusteringdf, 3, nstart = 25 )
+plot(k3,data = clusteringdf)
+```
+
+```{r echo=FALSE}
+set.seed(100)
+k4 <- kmeans(clusteringdf, 4, nstart = 25 )
+plot(k4,data = clusteringdf)
+```
+
+```{r echo=FALSE}
+set.seed(100)
+k5 <- kmeans(clusteringdf, 5, nstart = 25 )
+plot(k5,data = clusteringdf)
+```
+
+```{r echo=FALSE}
+set.seed(100)
+k6 <- kmeans(clusteringdf, 6, nstart = 25 )
+plot(k6,data = clusteringdf)
+```
+```{r echo=FALSE}
+set.seed(100)
+k7 <- kmeans(clusteringdf, 7, nstart = 25 )
+plot(k7,data = clusteringdf)
+```
+
+```{r echo=FALSE}
+set.seed(100)
+k8 <- kmeans(clusteringdf, 8, nstart = 25 )
+plot(k8,data = clusteringdf)
+```
+
+```{r echo=FALSE}
+set.seed(100)
+k9 <- kmeans(clusteringdf, 9, nstart = 25 )
+plot(k9,data = clusteringdf)
+```
+```{r echo=FALSE}
+set.seed(100)
+k10 <- kmeans(clusteringdf, 10, nstart = 25 )
+plot(k10,data = clusteringdf)
+```
+
+```{r echo=FALSE}
+set.seed(100)
+k11 <- kmeans(clusteringdf, 11, nstart = 25 )
+plot(k11,data = clusteringdf)
+```
+
+```{r echo=FALSE}
+set.seed(100)
+k12 <- kmeans(clusteringdf, 12, nstart = 25 )
+plot(k12,data = clusteringdf)
+```
+
+
+## Finding best cluster and Plotting. 10 to 12 clusters would be the best choice. I would choose 10
+```{r echo=FALSE}
+bestcluster <- FitKMeans(clusteringdf, max.clusters = 12, nstart = 25, seed = 100)
+bestcluster
+PlotHartigan(bestcluster)
+```
