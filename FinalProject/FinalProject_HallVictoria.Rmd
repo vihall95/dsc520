@@ -1,0 +1,269 @@
+---
+title: "Final Project DSC530"
+author: "Victoria Hall"
+date: "11/19/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "/Users/hallt/Documents/GitHub/dsc520/FinalProject")
+options(scipen=100)
+```
+``` {r echo=FALSE}
+library(foreign)
+library(tidyverse)
+library(stringr)
+library(ggplot2)
+library(pastecs)
+```
+
+
+
+# Presidential Elections and Party Identification
+
+## Introduction
+> The purpose of this research was to see if it was possible to predict the party identification of the president. Prior research suggests that economy and public opinion plays a large part in predicting presidential elections. There have been numerous attempts to create a model and forecast the US Presidential elections. According to the Brookings Institute many models have been presented to the public with varying levels of success. The attempt of this project is to see whether economic indicators are a good predictor of election results. In order to limit the focus, I chose to explore how economic indicators impact the party of the presidency.
+
+## Problem Statement
+> What information and transformations are needed to use the economy and opinions about the economy as predictors of the party affliation of the winning presidential candidate?
+
+## How to address the problem
+1. The First Step was finding appropriate data sources
+  a. For the economic data I utilized datasets from FRED, the Federal Reserve Bank. I used two indicators, the GDP and the GDP and Real Disposable Personal Income.The thought was that if the economy is strong the previous party would stay in office, while if it suffers, there would be a switch. 
+  b. The current state of the economy isn't necessarily the best way to understand public opinion about the economy. Wealth distribution in the country could mean an indicator like GDP or Real Disposable Income isn't necessarily showing the economic impact on individual citizens. According to Statista, 10% of the richest people in the United States own almost 70% of the country's total wealth. These outliers mean measurements like GDP are skewed and not necessarily the most honest view of the economy. In order to overcome this I pulled opinion data from the American National Election Survey. This is a large repository of public opinion data spanning decades that is performed around elections. I chose specifically questions about the economy. In the end I chose to analysis opinions about the overall state of the economy, unemployment and cost of living. 
+  c. Finally, I pulled a dataset that contains information about presidents and their party affiliation as well as the years they work in office. 
+
+```{r include=FALSE}
+#Reading in data sets
+anesdf<-read.spss("anes_timeseries_cdf.sav", to.data.frame = TRUE)
+incomedf<-read.csv("DSPIC96.csv")
+GDPdf<-read.csv("GDP.csv")
+presdf<-read.csv("US presidents listed - ALL NAMES.csv")
+```
+
+
+2.Cleaning and Merging DataFrames
+  a. The economic data I pulled was numerical and continuous. There were multiple measures taken per year. I found the average of each of our indicators for each year and changed the date formatting to allow for easier merging.I also limited the dataset to 1992 and after because the survey data I later use was only asked post 1992. 
+
+```{r echo=FALSE}
+#IncomeDataFrameDates are currently formatted as dd/mm/yyyy. In order to later merge frames, converting dates to years only and only 1992 and after.
+head(incomedf)
+incomedf$DATE<-str_sub(incomedf$DATE, -4, -1)
+incomedf$DATE<-as.numeric(incomedf$DATE)
+str(incomedf$DATE)
+length(incomedf$DATE)
+incomedf<-filter(incomedf,DATE >= 1992)
+#Because there are multiple responses in a year for the data, I am going to find the average per year
+incomedf1<-aggregate(DSPIC96~DATE,incomedf, mean)
+head(incomedf1)
+#Running the same mutations on the GDP data set
+head(GDPdf)
+GDPdf$DATE<-str_sub(GDPdf$DATE, -4, -1)
+GDPdf$DATE<-as.numeric(GDPdf$DATE)
+GDPdf<- filter(GDPdf, DATE>= 1992)
+GDPdf<-aggregate(GDP~DATE,GDPdf,mean)
+head(GDPdf)
+```
+  b. The ANES dataset was the largest and most problematic to work with. Hundreds of survey questions were asked and different questions were asked during different time frames. In order to find the variables for my study, I used the codebook to find questions related to what I wanted to review. I also had to change the datatype to factor as these responses are not numeric but rather a temperature gauge of feelings. 
+
+```{r echo=FALSE}
+#Selecting variables of analysis
+anesdf1<-anesdf[,c("VCF0004","VCF9220","VCF9226","VCF9053")]
+#Removing years where question wasn't asked
+anesdf1<-filter(anesdf1, VCF0004 >=1992)
+paste("ANES DataSet:",head(anesdf1))
+#Checking formatting of variables
+paste("Data Format:",str(anesdf1))
+#Rather than moving scales of opinion I'm going to convert responses as factors of 1- same, 2- better, 3-worse. Letting the balance of cases as NA. 
+anesdf1$VCF9220<-recode(anesdf1$VCF9220, "1. Gotten better" = 2,"2. Stayed the same" = 1, "3. Gotten worse" = 3)
+anesdf1$VCF9220<-as.factor(anesdf1$VCF9220)
+paste("Factors of VCF9220:",str(anesdf1$VCF9220))#Checking it worked correctly
+anesdf1$VCF9226<-recode(anesdf1$VCF9226, "1. Much better" = 2, "2. Somewhat better" = 2, "3. Same" = 1, "4. Somewhat worse" = 3, "5. Much worse"=3 )
+anesdf1$VCF9226<-as.factor(anesdf1$VCF9226)
+anesdf1$VCF9053<-recode(anesdf1$VCF9053, "1. Gone up a lot" = 2, "Gone up a little" = 2, "6. Gone up, DK/NA how much" = 2, "3. Same" = 1, "4. Fallen behind a little" = 3, "5. Fallen behind a lot" = 3, "7. Fallen behind, DK/NA how much" = 3)
+anesdf1$VCF9053<-as.factor((anesdf1$VCF9053))
+anesdf1<-rename(anesdf1, "DATE"=VCF0004)
+paste("Final Data Format:",str(anesdf1))
+```
+  c. For the presidential dataset, I had to subset only data 1992 and after and reconfigure my party information as categorical. It ended up being a binary.
+  
+```{r echo=FALSE}
+#Presidential Dataframe. Only keeping years after 1992 and refactoring party id.
+head(presdf)
+presdf<-filter(presdf,Years..after.inauguration.>=1992)
+presdf<-rename(presdf, "DATE"=Years..after.inauguration.)
+presdf$Party<-recode(presdf$Party,"Republican"=1, "Democrat"=2)
+presdf$Party<-as.factor(presdf$Party)
+str(presdf)
+```
+
+  d. Finally I merged the frames so that I had one cohesive dataframe. I used the date as my join.After our mutations and merges our dataset became extremely limited. Presidential data is already limited because there have only 45 unique presidents. The mutations have limited this to only four but this had to do with when survey questions were asked.
+
+``` {r echo=FALSE}
+#Merging 4 df together by date
+mergedf<-merge(incomedf1,GDPdf, by="DATE")
+mergedf<-merge(mergedf,presdf,by="DATE")
+mergedf<-merge(mergedf,anesdf1, by="DATE")
+head(mergedf)
+unique(mergedf$DATE)
+```
+## Analysis
+1. I first ran summary statistics on different elements of our data. Our GDP and Disposable Income Data are in billions. There is a lot of variance in both of these indicators. We also see increases over time but these increases may have to do with inflation over time. Our GDP and Disposable Income also have similar means though the range of disposable income is smaller than than GDP. 
+```{r echo=FALSE}
+paste("Real Disposable Income Summary Stats")
+stat.desc(mergedf$DSPIC96)
+
+paste("GDP Summary Stats")
+stat.desc(mergedf$GDP)
+
+paste("Overall Summary")
+summary(mergedf)
+
+```
+
+```{r echo=FALSE}
+gdpgraph <- ggplot(mergedf, aes(President,GDP, color = Party))+geom_point()
+gdpgraph <- gdpgraph + ggtitle("GDP By President") +scale_colour_discrete(labels=c("Republican", "Democrat"))
+gdpgraph
+
+dspincomegraph <- ggplot(mergedf, aes(President,DSPIC96, color = Party))+geom_point()
+dspincomegraph <- gdpgraph + ggtitle("Personal Income By President") +scale_colour_discrete(labels=c("Republican", "Democrat"))
+dspincomegraph
+```
+2. Next I created some histograms to observe the opinion data closer. Because this data is categorical, we can't extract central tendencies measures in the same way we can for numerical data. If first ran some overall views and then I ran by party to see if there are distinct differences in parties and economic opinions. Overall, opinion shows that for all three questions survey respondents indicated things were worse than before. However, when we separate out by party there are clear differences in the distributions. Overall during the Republican presidencies opinion on the economic indicators appears to be worse while with Democrats, the distribution of responses is either the same (worse, same, better) or shows that opinion is the economy is better. At this point, it should be noted that this is not an indication of causation. Right now there appears to be a relationship depending on party but this doesn't mean that public opinion on the economy is causing the party affliations. 
+
+```{r echo=FALSE}
+histopin <- ggplot(data=subset(mergedf, !is.na(VCF9220)), aes(VCF9220))+geom_bar()+scale_x_discrete("VCF9220", labels = c("1" = "Stayed the Same","2" = "Gotten Better", "3" = "Gotten Worse"))
+histopin <- histopin+ggtitle("Public Opinion on Economy")
+histopin
+```
+
+```{r echo=FALSE}
+histopin1 <- ggplot(data=subset(mergedf, !is.na(VCF9226)), aes(VCF9226))+geom_bar()+scale_x_discrete("VCF9226", labels = c("1" = "Stayed the Same","2" = "Gotten Better", "3" = "Gotten Worse"))
+histopin1 <- histopin+ggtitle("Public Opinion on Unemployment")
+histopin1
+```
+
+```{r echo=FALSE}
+histopin2 <- ggplot(data=subset(mergedf, !is.na(VCF9053)), aes(VCF9053))+geom_bar()+scale_x_discrete("VCF9053", labels = c("1" = "Stayed the Same","2" = "Gone Up", "3" = "Fallen Behind"))
+histopin2 <- histopin+ggtitle("Public Opinion on Income Keeping Up with Cost of Living")
+histopin2
+```
+
+``` {r echo=FALSE}
+repdata <- subset(mergedf, Party == 1)
+repdata <- as.data.frame(repdata)
+histopin3 <- ggplot(data=subset(repdata, !is.na(VCF9220)), aes(VCF9220))+geom_bar()+scale_x_discrete("VCF9220",
+                          labels = c("1" = "Stayed the Same","2" = "Gotten Better", "3" = "Gotten Worse"))
+histopin3 <- histopin3+ggtitle("Public Opinion on Economy During Republican Candidacies")
+histopin3
+```
+
+```{r echo=FALSE}
+repdata1 <- subset(mergedf, Party == 2)
+repdata1 <- as.data.frame(repdata1)
+histopin4 <- ggplot(data=subset(repdata1, !is.na(VCF9220)), aes(VCF9220))+geom_bar()+scale_x_discrete("VCF9220", labels = c("1" = "Stayed the Same","2" = "Gotten Better", "3" = "Gotten Worse"))
+histopin4 <- histopin4+ggtitle("Public Opinion on Economy During Democrat Candidacies")
+histopin4
+```
+
+```{r echo=FALSE}
+repdata <- subset(mergedf, Party == 1)
+repdata <- as.data.frame(repdata)
+histopin5 <- ggplot(data=subset(repdata, !is.na(VCF9226)), aes(VCF9226))+geom_bar()+scale_x_discrete("VC9226", labels = c("1" = "Stayed the Same","2" = "Gotten Better", "3" = "Gotten Worse"))
+histopin5 <- histopin5+ggtitle("Public Opinion on Unemployment During Republican Candidacies")
+histopin5
+```
+
+``` {r echo=FALSE}
+repdata1 <- subset(mergedf, Party == 2)
+repdata1 <- as.data.frame(repdata1)
+histopin6 <- ggplot(data=subset(repdata1, !is.na(VCF9226)), aes(VCF9226))+geom_bar()+scale_x_discrete("VCF9226",labels = c("1" = "Stayed the Same","2" = "Gotten Better", "3" = "Gotten Worse"))
+histopin6 <- histopin6+ggtitle("Public Opinion on Unemployment During Democrat Candidacies")
+histopin6
+```
+
+
+``` {r echo=FALSE}
+repdata <- subset(mergedf, Party == 1)
+repdata <- as.data.frame(repdata)
+histopin7 <- ggplot(data=subset(repdata, !is.na(VCF9053)), aes(VCF9053))+geom_bar()+ scale_x_discrete("VCF9053",labels = c("1" = "Stayed the Same","2" = "Gone Up", "3" = "Fallen Behind"))
+histopin7 <- histopin7+ggtitle("Public Opinion on Income Keeping up with the Cost of Living During Republican Candidacies")
+histopin7
+```
+
+
+``` {r echo=FALSE}
+repdata1 <- subset(mergedf, Party == 2)
+repdata1 <- as.data.frame(repdata1)
+histopin8 <- ggplot(data=subset(repdata1, !is.na(VCF9053)), aes(VCF9053))+geom_bar()
+histopin8 <- histopin8+ggtitle("Public Opinion on Income Keeping up with the Cost of Living During Democrat Candidacies")
+histopin8
+```
+
+## Implications
+> This analysis while narrow, does seem to indicate that there is a relationship between public opinion of the economy and the party affliation of the president. Our model would have to extrapolate on this relationship to in order to predict. IE, our model would need to be able to say given public opinion on the economy at this point in time, this party will when the next election. It is hard to measure pure economic indicators as effects because these numbers will more than likely increase year over year due to inflation and may not be a reflection of the president. This is why I opted to look at opinion in my histograms rather than the pure economic data. A logistic regression model would be the best modeling tool for this data because The US operates on a two party system and so our outcome is categorical and binary. I did attempt to run a model with just opinion data as the explanatory variables though the results really aren't meaningful due to the limitations I will discuss below. 
+
+```{r echo=FALSE}
+model <- glm(Party ~ VCF9220+ VCF9226+VCF9053, data=mergedf, family= "binomial")
+
+summary(model)
+predictionm1<-predict(model,mergedf,type="response")
+confmatrixm1<-table(Actual_Value=mergedf$Party,Predicted_Value=predictionm1>0.5)
+confmatrixm1
+```
+
+## Limitations 
+> There are a number of limitations and restraints over this study. First, my dataset was extremely narrow based on the survey questions I chose to review. The questions were only asked after 1992 so I only had 4 presidents for data.Second, it was hard to understand the impact of my economic indicators. OVertime, there is always an increase in GDP and Disposable income in the macro environment so it was hard to parse out effects during a specific time range. A better measure may have been to look at the change over the time of the presidencies in conjunction with the state of the economy in actual elections. If I could find a way to standardize this measure so elements like inflation aren't weighting results this could have been a better indicator. Third, the way I set up my dataframe had multiple years and instances, it wasn't looking at the 4 year election cycle. Finally, there are numerous elements that can impact an election outside of the economy. This doesn't look at campaign spending or even encumbency. An encumbent president is more likely to be reelected. 
+
+## Conclusions
+> At best, I can say that public opinion on the economy probably has an impact on the party of the winner of a US presidential election. I cannot at this time quantify this extent nor say there is any causation. The indicator that there is an effect is observed in the distributions of opinion when separated by party. There are distinct differences in the distributions of opinion when separated by party. 
+
+
+
+@article{,
+title = {Forecasting the Presidential Election: What can we learn from the models?},
+author = {James E. Campbell and Thomas E. Mann},
+year = {1996},
+url = {https://www.brookings.edu/articles/forecasting-the-presidential-election-what-can-we-learn-from-the-models/},}
+
+
+@data{,
+title = { Gross Domestic Product (GDP)},
+author = {Federal Reserve Bank of St. Louis},
+year = {2021},
+url = {https://fred.stlouisfed.org/series/GDP},}
+
+
+@data{,
+title = { Real Disposable Personal Income },
+author = {Federal Reserve Bank of St. Louis},
+year = {2021},
+url = {https://fred.stlouisfed.org/series/DSPIC96},}
+
+
+
+
+@data{DVN/42MVDX_2017,
+author = {MIT Election Data and Science Lab},
+publisher = {Harvard Dataverse},
+title = {{U.S. President 1976–2020}},
+UNF = {UNF:6:MkQHX147hJCgscG5IqK77g==},
+year = {2017},
+version = {DRAFT VERSION},
+doi = {10.7910/DVN/42MVDX},
+url = {https://doi.org/10.7910/DVN/42MVDX}
+}
+
+
+@data{,
+title = {ANES Time Series Cumulative Data File},
+author = {ANES},
+year = {2020},
+url = {https://electionstudies.org/data-center/anes-time-series-cumulative-data-file/},}
+
+
+
+
+  
+
